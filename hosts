@@ -1,0 +1,120 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+
+if ($> != 0) {
+    die "run me as root!\n";
+}
+
+if (!$ARGV[0]) {
+	exit_usage("Missing command argument.");
+}
+
+our $default_ip = "127.0.0.1";
+our $newline = "\r\n";
+our $hosts_file = "/mnt/c/Windows/System32/drivers/etc/hosts";
+our @hosts_content = ();
+
+open(FILE, "<$hosts_file") or die;
+while (<FILE>) {
+	push(@hosts_content, $_);
+}
+close(FILE);
+
+if ($ARGV[0] eq "show") {
+	foreach my $line (@hosts_content) {
+		print $line;
+	}
+	exit 0;
+} elsif ($ARGV[0] eq "add") {
+	if (!$ARGV[1]) {
+		exit_usage("Missing host argument.");
+	}
+	my $i = host_index($ARGV[1]);
+	if ($i < 0) {
+		my $entry = "$default_ip\t$ARGV[1]$newline";
+		push (@hosts_content, $entry);
+		print "Host $ARGV[1] added.\n";
+		print $entry . "\n";
+	} else {
+		print "Host $ARGV[1] already exists:\n";
+		print $hosts_content[$i] . "\n";
+		exit 0;
+	}
+} elsif ($ARGV[0] eq "rm") {
+	if (!$ARGV[1]) {
+		exit_usage("Missing host argument.");
+	}
+	my $i = host_index($ARGV[1]);
+	if ($i < 0) {
+		print "Host $ARGV[1] does not exist.\n";
+		exit 0;
+	} else {
+		splice(@hosts_content, $i, 1);
+		print "Host $ARGV[1] removed.\n";
+	}
+} elsif ($ARGV[0] eq "start") {
+	if (!$ARGV[1]) {
+		exit_usage("Missing host argument.");
+	}
+	my $i = host_index($ARGV[1]);
+	if ($i < 0) {
+		print "Host $ARGV[1] does not exist.\n";
+		exit 0;
+	} elsif ($hosts_content[$i] !~ m/^\#/) {
+		print "Host $ARGV[1] already started.\n";
+		print $hosts_content[$i] . "\n";
+		exit 0;
+	} else {
+		$hosts_content[$i] =~ s/^[#]+(.+)$/$1/;
+		print "Host $ARGV[1] started.\n";
+		print $hosts_content[$i] . "\n";
+	}
+} elsif ($ARGV[0] eq "stop") {
+	if (!$ARGV[1]) {
+		exit_usage("Missing host argument.");
+	}
+	my $i = host_index($ARGV[1]);
+	if ($i < 0) {
+		print "Host $ARGV[1] does not exist.\n";
+		exit 0;
+	} elsif ($hosts_content[$i] =~ m/^\#/) {
+		print "Host $ARGV[1] already stopped.\n";
+		print $hosts_content[$i] . "\n";
+		exit 0;
+	} else {
+		$hosts_content[$i] = "#" . $hosts_content[$i];
+		print "Host $ARGV[1] stopped.\n";
+		print $hosts_content[$i] . "\n";
+	}
+} else {
+	exit_usage("Command $ARGV[0] not recognized.");
+}
+
+open(FILE, ">$hosts_file") or die;
+foreach my $line (@hosts_content) {
+	print FILE $line;
+}
+close(FILE);
+
+
+sub exit_usage {
+	my $exit_message;
+	if ($exit_message = shift) {
+		print $exit_message . "\n";
+	}
+	print "hosts [show] [add|rm|start|stop <host>]\n";
+	exit 1;
+}
+
+sub host_index {
+	my $host = shift;
+	my $i;
+	for ($i = 0; $i <= $#hosts_content; $i++) {
+		if ($hosts_content[$i] =~ m/^[#]*[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\s$host\s$/) {
+			return $i;
+		}
+	}
+	return -1;
+}
